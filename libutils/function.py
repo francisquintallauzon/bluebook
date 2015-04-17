@@ -34,54 +34,81 @@ class propertydescriptor(basicdescriptor):
             return data
 
 
-def timing(input_fn, *args, **kwargs):
-    """
-    The timing decorator adds a elapsed method to the decorated input_fn.  
-    It that computes it's execution time each time input_fn is called. 
-    
-    input_fn.elapsed will return input_fn's execution time the last time it was called.
-    
-    This decorator is NOT thread safe
-    """
+def timing(input_fn):
     from time import time
-    if hasattr(input_fn, "elapsed"):
-        raise AttributeError, "Cannot decorate input_fn because it already has and 'elapsed' attribute"
-    def new(*args, **kwargs):
-        st = time()
-        ret = input_fn(*args, **kwargs)
-        new.elapsed = time()-st
-        return ret
-    new.__dict__ = input_fn.__dict__
-    new.elapsed = 0
-    return new
+    from types import MethodType
+    """
+    The timing decorator adds a elapsed, cound and average methods to the decorated input_fn.
 
-#    class new(object):
-#        def __init__(self):
-#            self.__elapsed = 0
-#        
-#        def __call__(self, *args, **kwargs):
-#            st = time()
-#            retval = input_fn(*args, **kwargs)
-#            self.__elapsed = time()-st
-#            return retval
-#        
-#        @property
-#        def elapsed(self):
-#            e = self.__elapsed
-#            self.__elapsed = 0
-#            return e
-#    
-#    return new()
+    input_fn.elapsed will return input_fn's total execution time
+    input_fn.count will return input_fn's total number of executions
+    input_fn.average will return input_fn's average execution time
+    """
+    class override(object):
 
+        def __init__(self, function):
+            self.__function = function
+            self.__elapsed = 0
+            self.__count = 0
+            self.__last = 0
+
+        def __call__(self, *args, **kwargs):
+            self.__count += 1
+            st = time()
+            ret = self.__function(*args, **kwargs)
+            self.__last = time()-st
+            self.__elapsed += self.__last
+            return ret
+
+        def __get__(self, instance, owner):
+            return MethodType(self, instance, owner)
+
+        @property
+        def elapsed(self):
+            return self.__elapsed
+
+        @property
+        def count(self):
+            return self.__count
+
+        @property
+        def average(self):
+            return self.__elapsed / self.__count
+
+        @property
+        def last(self):
+            return self.__last
+
+    retval = override(input_fn)
+    return retval
+
+
+class addstatic(object):
+
+    def __init__(self, **statics):
+        self.statics = statics
+
+    def __call__(self, function):
+
+        class override(object):
+
+            def __init__(self, function, statics):
+                from libutils.dict import dd
+                self.__function = function
+                self.statics = dd(statics)
+
+            def __call__(self, *args, **kwargs):
+                return self.__function(*args, **kwargs)
+
+            def __get__(self, instance, objtype):
+                from types import MethodType
+                return MethodType(self, instance)
+
+        retval = override(function, self.statics)
+        return retval
 
 
 class classproperty(property):
-    """
-    The exception decorator adds an exception method to the decorated input_fn
-    that catches any exception raised by the function.  If an exception is
-    caught, it the output from sys.exc_info() is stored in a .exception member.
-    If not exception is caught, input_fn.exception will be None.
-    """
     def __get__(self, cls, owner):
         return self.fget.__get__(None, owner)()
 
@@ -98,7 +125,7 @@ def exception(input_fn, *args, **kwargs):
     """
 
     if hasattr(input_fn, "exception"):
-        raise AttributeError, "Cannot decorate input_fn because it already has and 'exception' attribute"
+        raise AttributeError("Cannot decorate input_fn because it already has and 'exception' attribute")
     def new(*args, **kwargs):
         from sys import exc_info
         try :
@@ -130,16 +157,21 @@ def noraise(input_fn):
 if __name__ == '__main__':
     from time import sleep
 
-    @timing
-    @exception
-    def func_1():
-        sleep(1)
-        
-    func_1()
-    print func_1.elapsed
-    print func_1.elapsed
+    class cls(object):
+
+        @timer
+        def fnc(self):
+            sleep(1)
+
+    c = cls()
+    c.fnc()
+    c.fnc()
+
+    print(c.fnc.elapsed)
+    print(c.fnc.count)
+    print(c.fnc.average)
 
 
-    
-        
-    
+
+
+

@@ -27,9 +27,9 @@ class splits(object):
         self.__splits.test  = examples[len(self.__splits.train+self.__splits.valid):]
         self.__splits.full  = examples
 
-        print "\nSplits statistics:"
+        print("\nSplits statistics:")
         for split_id in self.__splits:
-            print "        {:7d} items in {} set".format(len(self[split_id]), split_id)
+            print("        {:7d} items in {} set".format(len(self[split_id]), split_id))
 
     def __getitem__(self, item):
         return list(self.__splits[item])

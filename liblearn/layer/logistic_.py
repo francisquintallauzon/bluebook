@@ -14,21 +14,17 @@ class logistic(base):
 
     def __init__(self, nb_inp, nb_out, W=None, b=None):
         """ Logistic regression layer """
+
+        super(logistic, self).__init__()    
+
+        self.add_hparam(nb_inp=nb_inp)
+        self.add_hparam(nb_out=nb_out)
+        
+        self.add_param(W = shared_x(np.zeros((self.nb_inp, self.nb_out), float_x), name='W') if W is None else W, optimizable=True)
+        self.add_param(b = shared_x(np.zeros(self.nb_out, float_x), name='b') if b is None else b, optimizable=True)
         
 
-        hparams = {'nb_inp':nb_inp,
-                   'nb_out':nb_out} 
-        
-        params = {'b':b,
-                  'W':W}        
-        
-        super(logistic, self).__init__(hparams, params)        
-        
-        # Optimizable parameters
-        self.b = b if b else shared_x(np.zeros(self.nb_out, float_x), name='b')
-        self.W = W if W else shared_x(np.zeros((self.nb_inp, self.nb_out), float_x), name='W')
-
-    def __call__(self, inp, dropout_level=0):
+    def __call__(self, inp, mode=None):
         return T.nnet.softmax(T.dot(inp, self.W) + self.b)
         
     def __str__(self):

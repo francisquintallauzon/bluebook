@@ -8,14 +8,15 @@ Created on Sun Sep  8 16:39:38 2013
 import os
 import pycuda.autoinit
 from pycuda.driver          import Device
-from os.path                import join, splitext, split, abspath
+from os.path                import join, splitext, split, abspath, pathsep
 from subprocess             import Popen as popen
 from threading              import Thread
 from Queue                  import Queue
 from traceback              import print_exc
 from time                   import sleep
 from datetime               import datetime
-from libutils.path    import make_dir
+from libutils.path          import make_dir
+
 
 class experiment_scheduler(object):
 
@@ -26,7 +27,7 @@ class experiment_scheduler(object):
         self.nb_parr = nb_parr
         self.device = device
         self.device_id = device_id
-        
+
     def run(self):
 
         # Extract experiment name
@@ -40,7 +41,7 @@ class experiment_scheduler(object):
 
         # Setup a queue of experiments
         self.__tasks = Queue()
-        
+
         # process list
         self.__processes = Queue()
 
@@ -49,18 +50,9 @@ class experiment_scheduler(object):
             self.__tasks.put((i, join('experiments', self.module, self.experiment_fn)))
 
         # Start workers
-        if self.device_id:
-            print 'Running {} experiments on {}{}, (with {} exp / {})'.format(self.nb_exp, self.device, self.device_id, self.nb_parr, self.device)
-            print '--------------------------------------------------------------------------\n'
-            for i in range(self.nb_parr):
-                worker = Thread(target=self.__thread, args=(self.device_id,), name = '{}_{}_thread_{}'.format(self.device, self.device_id, i))
-                worker.setDaemon(True)
-                worker.start()
-                self.workers += [worker]
-
-        else:
-            print 'Running {} experiments on {} {}{}, (with {} exp / {})'.format(self.nb_exp, Device.count(), self.device, 's' if self.nb_exp>1 else '', self.nb_parr, self.device)
-            print '--------------------------------------------------------------------------\n'
+        if self.device_id is None:
+            print('Running {} experiments on {} {}{}, (with {} exp / {})'.format(self.nb_exp, Device.count(), self.device, 's' if self.nb_exp>1 else '', self.nb_parr, self.device))
+            print('--------------------------------------------------------------------------\n')
             for device_id in range(Device.count()):
                 for i in range(self.nb_parr):
                     worker = Thread(target=self.__thread, args=(device_id,), name = '{}_{}_thread_{}'.format(self.device, self.device_id, i))
@@ -68,6 +60,14 @@ class experiment_scheduler(object):
                     worker.start()
                     self.workers += [worker]
                     sleep(10)
+        else:
+            print('Running {} experiments on {}{}, (with {} exp / {})'.format(self.nb_exp, self.device, self.device_id, self.nb_parr, self.device))
+            print('--------------------------------------------------------------------------\n')
+            for i in range(self.nb_parr):
+                worker = Thread(target=self.__thread, args=(self.device_id,), name = '{}_{}_thread_{}'.format(self.device, self.device_id, i))
+                worker.setDaemon(True)
+                worker.start()
+                self.workers += [worker]
 
         # Wait until all experiments have finished before returning
         [w.join() for w in self.workers if w.is_alive()]
@@ -78,11 +78,11 @@ class experiment_scheduler(object):
         while self.__tasks.qsize():
 
             try:
-                exp_id, experiment_fn = self.__tasks.get()
+                exp_id, experiment_fn = self.__tasks.get_nowait()
             except Queue.Empty:
                 return
 
-            print 'Running experiment {} on gpu{}'.format(exp_id, gpu_id)
+            print('Running experiment {} on gpu{}'.format(exp_id, gpu_id))
 
             # Make experiment path
             result_path = join(self.output_dir, "{0:05d}".format(exp_id))
@@ -101,17 +101,17 @@ class experiment_scheduler(object):
                 env['THEANO_FLAGS'] += ",device=gpu{}".format(gpu_id)
                 env['THEANO_FLAGS'] += ",nvcc.fastmath=True"
                 env['THEANO_FLAGS'] += ",exception_verbosity=high"
-                env['THEANO_FLAGS'] += ",optimizer_including=cudnn"
-                env['PYTHONPATH']  = abspath("../datasets")
-                env['PYTHONPATH'] += ':' + abspath("./")
+                env['THEANO_FLAGS'] += ",optimizer_including=conv_meta"
+                env['PYTHONPATH']  = abspath(join('..', 'datasets'))
+                env['PYTHONPATH'] += pathsep + abspath(".")
 
                 # Open process
                 p = popen(call, env=env, shell=False)
                 self.__processes.put(p)
-                
+
                 # Wait for process to finish
                 p.wait()
-                
+
             except:
                 print_exc()
                 with open(join(result_path, 'error.txt'), 'w') as f:
@@ -121,7 +121,7 @@ class experiment_scheduler(object):
     def kill(self) :
         while self.__processes.qsize():
             p = self.__processes.get()
-            print 'Killing process {}'.format(p)
+            print('Killing process {}'.format(p))
             try :
                 p.kill()
             except OSError:
@@ -137,18 +137,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Runs experiment scheduler on a python experiment file")
     parser.add_argument('--fn', required=True, type=str, help='Source python file that contains experiment')
     parser.add_argument('--module', required=True, type=str, help='Experiment module (ex. emneuron or bloody)')
-    parser.add_argument('--exp', required=False, default=1, type=int, help='Total number of experiments to run')
+    parser.add_argument('--nb', required=False, default=1, type=int, help='Total number of experiments to run')
     parser.add_argument('--parr', required=False, default=1, type=int, help='Number of parallel experiments per device.  1 is recommended for gpu')
-    parser.add_argument('--device_type', required=False, default='gpu', type=str, help='Device type to be used, either "cpu" or "gpu"')
-    parser.add_argument('--device_id', required=False, default=None, type=int, help='Specific device id gpu to be used.  If none is specified, then all devices are used.  (Does not apply if device==cpu)')
+    parser.add_argument('--devicetype', required=False, default='gpu', type=str, help='Device type to be used, either "cpu" or "gpu"')
+    parser.add_argument('--deviceid', required=False, default=None, type=int, help='Specific device id gpu to be used.  If none is specified, then all devices are used.  (Does not apply if device==cpu)')
 
     args = parser.parse_args()
-    scheduler = experiment_scheduler(args.module, args.fn, args.exp, args.parr, args.device_type, args.device_id)
+    scheduler = experiment_scheduler(args.module, args.fn, args.nb, args.parr, args.devicetype, args.deviceid)
     try :
         scheduler.run()
-    except  (SystemExit, KeyboardInterrupt) as e:
-        print 'Exiting following a SystemExit or KeyboardInterrupt'.format(e.message)
+    except  SystemExit:
+        print('Exiting following a SystemExit exception')
+    except KeyboardInterrupt:
+        print('Exiting following a KeyboardInterrupt exception')
     finally:
         scheduler.kill()
-        
-    print "Experiment done!"
+
+    print("Experiment done!")

@@ -15,8 +15,8 @@ from libutils.path            import make_dir
 from libutils.path            import delete
 from libutils.dict            import dd
 from libutils.string          import sstr
-from traceback                      import print_exc
-from math                           import log
+from traceback                import print_exc
+from math                     import log
 
 
 
@@ -51,18 +51,25 @@ def analyze(experiment_path, output_path, objectives, ignores, ignore_vals, subs
             ehp["out."+obj] = eout[obj]
 
     # Get exclusion
-    arr, _ = ehp.get_array(ehp.keys()[0])
+    arr, _ = ehp.get_array(list(ehp.keys())[0])
     include = np.ones(arr.size)
     if ignore_vals != None:
-        for key, value in ignore_vals.items():
+        for key, value in list(ignore_vals.items()):
             arr, _ = ehp.get_array(key)
             include *= (arr != value)
 
     fig = plt.figure()  #(figsize = (4,3))
 
-    for xlabel in ehp.keys():
+    for xlabel in list(ehp.keys()):
 
-        if xlabel in ignores:
+        do_ignore = False
+        for ignore in ignores:
+            print(ignore, xlabel, ignore in xlabel)
+            if ignore in xlabel:
+                do_ignore = True
+                break
+
+        if do_ignore:
             continue
 
         fig.clf()
@@ -77,10 +84,10 @@ def analyze(experiment_path, output_path, objectives, ignores, ignore_vals, subs
         if np.unique(x).size == 1:
             continue
 
-        print "For {}, number of unique x is {}".format(xlabel, np.unique(x).size)
+        print("For {}, number of unique x is {}".format(xlabel, np.unique(x).size))
         if np.unique(x).size == 2:
             for val in np.unique(x):
-                print '        {}'.format(val)
+                print('        {}'.format(val))
 
         # Convert object dtype to string
         if x.dtype == np.object:
@@ -98,7 +105,7 @@ def analyze(experiment_path, output_path, objectives, ignores, ignore_vals, subs
 
             un = np.unique(x).astype(sstr)
             xticks = un.copy()
-            un = dict(zip(un, np.arange(un.size)))
+            un = dict(list(zip(un, np.arange(un.size))))
             x = np.asarray([un[val] for val in x], dtype = sstr)
             ax.set_xticks(np.arange(xticks.size))
             ax.set_xticklabels(xticks)
@@ -108,16 +115,16 @@ def analyze(experiment_path, output_path, objectives, ignores, ignore_vals, subs
                 if 'path' in xlabel:
                     ticklabel.set_fontsize(3)
 
-        for ylabel in eout.keys():
+        for ylabel in list(eout.keys()):
             if ylabel in objectives:
                 y, _ = eout.get_array(ylabel)
-                ax.plot(x[this_include],y[this_include], marker = '.', markersize = 5, linestyle='none', label = ylabel)
+                ax.plot(x[this_include * (y!=0)],y[this_include * (y!=0)], marker = '.', markersize = 5, linestyle='none', label = ylabel)
 
         try:
             xlim = ax.get_xlim()
             ax.set_xlim(xlim[0]-(xlim[1]-xlim[0])*0.05, xlim[1]+(xlim[1]-xlim[0])*0.05)
             ax.legend(loc=1, fontsize=7)
-            ax.set_yscale('log')
+            #ax.set_yscale('log')
             fig.savefig(os.path.join(output_path, os.path.split(experiment_path)[1] + "." + xlabel + '.png'), bbox_inches='tight', dpi=600)
         except:
             print_exc()
@@ -134,7 +141,7 @@ def clean(experiment_path, objectives):
             do_delete = True
 
         if do_delete:
-            print "deleting {} because experiment was incomplete".format(path)
+            print("deleting {} because experiment was incomplete".format(path))
             delete(path)
 
 
@@ -197,7 +204,7 @@ class expdd(dict):
 
         # Count votes
         max_votes = 0
-        for key_t, val in typed.items():
+        for key_t, val in list(typed.items()):
             if val > max_votes:
                 winner_t = key_t
                 max_votes = val
@@ -211,11 +218,11 @@ class expdd(dict):
             include = np.zeros(output.size, dtype=np.bool)
             include[self[key].index]=True
         except :
-            print "key = ", key
-            print "output.shape = ", output.shape
-            print "self[key].index = ", self[key].index
-            print "self[key].value = ", self[key].value
-            print "winner_t = {}; max_votes = {}".format(winner_t, max_votes)
+            print("key = ", key)
+            print("output.shape = ", output.shape)
+            print("self[key].index = ", self[key].index)
+            print("self[key].value = ", self[key].value)
+            print("winner_t = {}; max_votes = {}".format(winner_t, max_votes))
             raise
 
         return output, include
@@ -224,11 +231,11 @@ class expdd(dict):
     def __iadd__(self, other):
 
         if not isinstance(other, dict):
-            raise TypeError, "__iadd__ rhs is of must be or derive from type dict.  Rather, is of type type {}".format(type(other))
+            raise TypeError("__iadd__ rhs is of must be or derive from type dict.  Rather, is of type type {}".format(type(other)))
 
         self._nb += 1
 
-        for key, value in other.items():
+        for key, value in list(other.items()):
 
             if key in self:
                 self[key].value += [value]

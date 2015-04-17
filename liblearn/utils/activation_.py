@@ -91,4 +91,4 @@ def activation(activation_type):
             return act
 
     # Activation_type not found in current list
-    raise NotImplementedError, "{} is an unrecognized activation type".format(activation_type)
+    raise NotImplementedError("{} is an unrecognized activation type".format(activation_type))

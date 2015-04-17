@@ -11,12 +11,12 @@ from threading                 import Thread
 
 
 class parallel_random_iterator(object):
-    def __init__(self, examples, extractor, extractor_kwargs, load_ratio, loops_per_epoch=1, nb_workers=3):
+    def __init__(self, examples, extractor, extractor_kwargs, load_ratio, dataset_per_epoch, nb_workers=3):
         self.tasks = Queue.Queue()
         self.results = Queue.Queue(2)
         self.load_ratio = load_ratio
+        self.dataset_per_epoch = dataset_per_epoch
         self.examples = list(examples)
-        self.loops_per_epoch = loops_per_epoch
         self.extractor = extractor
         self.extractor_kwargs = extractor_kwargs
 
@@ -29,10 +29,9 @@ class parallel_random_iterator(object):
 
         # Enqueue tasks
         batch_sz = int(load_ratio * len(self.examples))
-        epoch_sz = int(loops_per_epoch * len(self.examples))
-        for batch, i in enumerate(range(0, epoch_sz, batch_sz)):
-            self.tasks.put(self.examples[i:i+batch_sz])
-        self.__nb_batches = batch+1
+        for pos in range(0, int(len(self.examples)*self.dataset_per_epoch), batch_sz):
+            self.tasks.put(self.examples[pos:pos+batch_sz])
+        self.__nb_batches = self.tasks.qsize()
 
         self.__it = 0
 
@@ -47,7 +46,7 @@ class parallel_random_iterator(object):
         return self
 
 
-    def next(self):
+    def __next__(self):
 
         if self.__it < self.__nb_batches:
             self.__it += 1
@@ -61,7 +60,7 @@ class parallel_random_iterator(object):
 
             try:
                 examples = self.tasks.get(timeout=0.01)
-            except Queue.Empty:
+            except queue.Empty:
                 break
 
             # Starting extraction process

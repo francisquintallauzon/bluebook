@@ -40,20 +40,20 @@ class element(object):
         self.path = path
         self.filename = fn
 
-        if label:
+        if label is not None:
             self.label = label
 
-        if desc:
+        if desc is not None:
             self.desc = desc
 
-        if origin :
+        if origin is not None :
             self.origin = origin
 
-        if index :
+        if index is not None:
             self.id = index
 
     def get_image(self):
-        return cv2.imread(join(self.path, self.filename)).astype(np.float32)[:,:,::-1]/255.
+        return cv2.imread(join(self.path, self.filename))[:,:,::-1]
 
     #def set_labelmap(self, labelmap):
     #    self.labelmap = labelmap

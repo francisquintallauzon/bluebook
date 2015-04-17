@@ -4,34 +4,29 @@ Created on Wed Feb 18 13:23:28 2015
 @author: francis
 """
 
-if __name__ == '__main__':
-    import sys
-    sys.path.append("../")
-
-
 import numpy                   as np
 import multiprocessing         as mp
 from time                      import time
 from math                      import ceil
 from scipy.misc                import imresize
-from parallel_random_iterator_ import parallel_random_iterator
+from .parallel_random_iterator_ import parallel_random_iterator
 
 
 class randompatchiterator(object):
 
-    def __init__(self, examples, patch_sz, reshape_sz, corrupt, load_ratio, loops_per_epoch=1, nb_workers=3):
+    def __init__(self, examples, patch_sz, reshape_sz, corrupt, load_ratio, dataset_per_epoch=1, nb_workers=3):
         self.examples = examples
         self.patch_sz = patch_sz
         self.reshape_sz = reshape_sz
         self.load_ratio = load_ratio
+        self.dataset_per_epoch = dataset_per_epoch
         self.corrupt = corrupt
         self.nb_workers = nb_workers
-        self.loops_per_epoch = loops_per_epoch
 
         self.extractor_kwargs = {'patch_sz':patch_sz, 'reshape_sz':reshape_sz, 'corrupt':corrupt}
 
     def __iter__(self):
-        return parallel_random_iterator(self.examples, extractor, self.extractor_kwargs, self.load_ratio, self.loops_per_epoch, self.nb_workers)
+        return parallel_random_iterator(self.examples, extractor, self.extractor_kwargs, self.load_ratio, self.dataset_per_epoch, self.nb_workers)
 
     def __call__(self):
         return self.__iter__()

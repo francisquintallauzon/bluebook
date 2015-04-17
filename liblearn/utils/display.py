@@ -17,7 +17,7 @@ import theano as th
 def imsave(img, fn):
 
     if img.ndim != 2 and img.ndim != 3:
-        raise NotImplementedError, 'Expect img.ndim (={}) to be 2 or 3'.format(img.ndim)
+        raise NotImplementedError('Expect img.ndim (={}) to be 2 or 3'.format(img.ndim))
 
     if img.ndim == 2:
         img = (img * 255.0).astype(np.uint8)
@@ -71,7 +71,7 @@ def filterstoimg(W, size, layout=None, scale = 'local', fn = None):
         height, width = size
         nb_channels = 1
     else:
-        raise ValueError, "Dimension of input size (={}) should be 2 or 3".format(len(size))
+        raise ValueError("Dimension of input size (={}) should be 2 or 3".format(len(size)))
 
     nb_filters = W.shape[1]
 
@@ -139,10 +139,10 @@ def convfilterstoimg(W, layout=None, scale = 'local', fn = None):
 
     # Extract size information
     if W.ndim != 4:
-        raise ValueError, "Number of dimension of W (={}) should be 4".format(W.ndim)
+        raise ValueError("Number of dimension of W (={}) should be 4".format(W.ndim))
 
     if not(W.shape[1] == 1 or W.shape[1] == 3 or W.shape[1] == 4):
-        raise ValueError, "Shape of second dimension (i.e. nb_channels) of W (= {}), but should be 1, 3 or 4".format(W.shape[1])
+        raise ValueError("Shape of second dimension (i.e. nb_channels) of W (= {}), but should be 1, 3 or 4".format(W.shape[1]))
 
     nb_channels, height, width = W.shape[1:]
 

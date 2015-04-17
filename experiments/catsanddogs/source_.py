@@ -6,9 +6,9 @@ Created on Fri Jan 23 15:58:43 2015
 """
 
 from os.path import join
-from element_ import element
-from datamodel_ import datamodel
 from libutils.path import walk_files
+from libutils.dict import dd
+from liblearn.datamodel import element, datamodel
 
 
 class source(datamodel):
@@ -19,6 +19,8 @@ class source(datamodel):
         datamodel.__init__(self)
 
         self.path = path if path else self.path
+
+        self.splits = dd({split:[] for split in ['train', 'valid', 'test']})
 
         # Maps class label to a list of images for each given class
         for fn in walk_files(self.path, join=False, explore_subfolders=False):
@@ -31,7 +33,7 @@ class source(datamodel):
             if cls not in self.classes:
                 self.classes.append(cls)
 
-            example = element(self.path, fn, self.classes.index(cls), index=idx)
+            example = element(self.path, fn, label=self.classes.index(cls), desc=cls, index=idx)
 
             self.examples.append(example)
 
@@ -42,9 +44,9 @@ class source(datamodel):
             else :
                 self.splits.test.append(example)
 
-        print "Cats and dogs dataset is loaded with:"
+        print("Cats and dogs dataset is loaded with:")
         for split_id in self.splits:
-            print "    {:7d} examples in {} set".format(len(self.splits[split_id]), split_id)
+            print("    {:7d} examples in {} set".format(len(self.splits[split_id]), split_id))
 
 
 if __name__ == '__main__':

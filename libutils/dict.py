@@ -7,7 +7,7 @@ Created on Thu Feb 07 13:28:14 2013
 
 from collections import OrderedDict
 from os.path import splitext
-import cPickle as pickle
+import pickle as pickle
 
 class dd(OrderedDict):
 
@@ -21,7 +21,7 @@ class dd(OrderedDict):
             try :
                 return super(dd, self).__getattr__(key)
             except AttributeError:
-                raise AttributeError, 'key = {}'.format(key)
+                raise AttributeError('key = {}'.format(key))
 
     def __setattr__(self, key, value):
 
@@ -50,7 +50,7 @@ class dd(OrderedDict):
     @classmethod
     def __add(cls, right, left):
         left = dd(left)
-        for key, val in left.items():
+        for key, val in list(left.items()):
             if key in right:
                 right[key] += val
             else:
@@ -69,13 +69,14 @@ class dd(OrderedDict):
 
     @classmethod
     def load(cls, fn):
+        print fn
         with open(fn, 'r') as f:
             return pickle.load(f)
 
     @classmethod
     def tostr(cls, d=None, prefix=''):
         s = ""
-        for key, value in d.items():
+        for key, value in list(d.items()):
             if isinstance(value, dict):
                 s += cls.tostr(value, prefix + str(key) + '.')
             else:

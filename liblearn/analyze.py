@@ -4,16 +4,17 @@ Created on Tue Apr 23 14:02:12 2013
 
 @author: root
 """
+import results
+from os.path                import join
+from liblearn.utils.analyze import analyze
 
-from learn.utils.analyze    import analyze
-
-objectives = ['emneuron.error.valid_smooth']
-substitutes = {"preprocess.nb_pca_components":"preprocess.nb_pca", "preprocess.np_pca":"preprocess.nb_pca"}
-ignores = ['dataset.data_path']
+objectives = ['convnet.error.final_test', 'convnet.error.final_valid']
+substitutes = {}
+ignores = ['model.layers']
 ignores_val = None #{'features.learn_imbalance':0}
-out_to_hp = ['zerobias_0.nb_steps', 'emneuron.nb_steps']
+out_to_hp = ['convnet.nb_epoch']
 
-experiment_path = '/home/francis/experiments/results/emneuron_014'
-output_path = '/home/francis/experiments/results/emneuron_014_analysis'
+experiment_path = join(results.path(), 'catsanddogs', 'exp001')
+output_path = join(results.path(), 'catsanddogs', 'exp001_analysis')
 analyze(experiment_path, output_path, objectives, ignores, ignores_val, substitutes, out_to_hp)
-print 'Done!'
+print('Done!')

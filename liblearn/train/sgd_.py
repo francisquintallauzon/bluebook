@@ -124,7 +124,7 @@ class sgd(object):
         # Determine whether learning is supervised or not
         self.supervised = labels != None
         self.do_validation = self.do_validation and bool(valid_cost)
-        print '\nInitializing sgd for {} learning of {} {} validation.'.format({0:'unsupervised', 1:'supervised'}[self.supervised], model_id, {0:'without', 1:'with'}[self.do_validation])
+        print('\nInitializing sgd for {} learning of {} {} validation.'.format({0:'unsupervised', 1:'supervised'}[self.supervised], model_id, {0:'without', 1:'with'}[self.do_validation]))
 
         # Initializations
         self.additionnal_updates= additionnal_updates if isinstance(additionnal_updates, list) else [additionnal_updates]
@@ -169,18 +169,16 @@ class sgd(object):
         # Save initial value of parameters
         self.init = dd([(param, shared_x(param.get_value())) for param in self.params])
 
-        if self.supervised:
+        if self.do_validation:
             self.best_performance = sys.float_info.max
-            self.best_params = self.init
+            self.best_params = dd([(param, param.get_value()) for param in self.params])
 
         # Initialize lastupdates
-        self.last_update = dd()
-        for param in self.params:
-            self.last_update[param] = shared_x(np.zeros_like(param.get_value()))
+        self.last_update = dd([(p, shared_x(np.zeros_like(p.get_value()))) for p in self.params])
 
         # Learning updates
         updates = []
-        for param, grad in self.grads.items():
+        for param, grad in list(self.grads.items()):
             last = self.last_update[param]
             gradient = last*momentum + learning_rate*grad
             updates.append((param, param-gradient))
@@ -207,7 +205,7 @@ class sgd(object):
             self.valid_cost_fn = th.function(inputs = [self.inp, labels], outputs = [valid_cost, valid_error], allow_input_downcast=True)
 
             if debug_nodes:
-                self.debug_fn = th.function(inputs = [], outputs = [output for output in debug_nodes.values()],
+                self.debug_fn = th.function(inputs = [], outputs = [output for output in list(debug_nodes.values())],
                                             givens = {self.inp: self.shr_train_data, labels:self.shr_train_labels},
                                             allow_input_downcast=True, on_unused_input='ignore')
 
@@ -227,7 +225,7 @@ class sgd(object):
             self.valid_cost_fn = th.function(inputs = [self.inp], outputs = valid_cost, allow_input_downcast=True)
 
             if debug_nodes:
-                self.debug_fn = th.function(inputs = [], outputs = [output for output in debug_nodes.values()],
+                self.debug_fn = th.function(inputs = [], outputs = [output for output in list(debug_nodes.values())],
                                             givens = {self.inp: self.shr_train_data},
                                             allow_input_downcast=True, on_unused_input='ignore')
 
@@ -250,7 +248,7 @@ class sgd(object):
 
         # Initialize learning stats plots
         if self.subplots:
-            for sp in self.subplots.values():
+            for sp in list(self.subplots.values()):
                 sp.clf()
             self.subplots = dd()
 
@@ -271,7 +269,7 @@ class sgd(object):
                 sp[1,3].set(yscale='log')
             self.subplots[param] = sp
 
-        for node in self.debug_nodes.values():
+        for node in list(self.debug_nodes.values()):
             sp = subplots(2, 1, 6, 3, projection='recurrent')
             for name, label in zip(line_names, line_labels):
                 sp[1,0].add_line(name=name, label=label)
@@ -319,7 +317,7 @@ class sgd(object):
 
             # Perform validation step
             if self.do_validation:
-                self.__valid()
+                self.__valid(epoch)
 
             # Check for gradient explosion and revert parameters if necessary
             self.__revert_exploding_gradient()
@@ -354,21 +352,29 @@ class sgd(object):
 
             # Overfit based stopping criterion
             if self.do_validation:
-                if self.cost.epoch > self.lookback+1:
-                    if self.supervised:
-                        if self.error.valid_ema[-1] > self.error.valid_ema[-int(self.lookback/self.loops_per_epoch+1)]:
-                            break
-                    else :
-                        if self.cost.valid_ema[-1] > self.cost.valid_ema[-int(self.lookback/self.loops_per_epoch+1)]:
-                            break
+                if epoch >= self.lookback:
+                    try :
+                        if self.supervised:
+                            if self.error.valid_ema[-1] > self.error.valid_ema[-self.lookback//self.loops_per_epoch-1]:
+                                break
+                        else :
+                            if self.cost.valid_ema[-1] > self.cost.valid_ema[-self.lookback//self.loops_per_epoch-1]:
+                                break
+                    except :
+                        print(self.cost.epoch,  self.lookback+1)
+                        print(-self.lookback//self.loops_per_epoch-1)
+                        print(len(self.cost.valid_ema))
+                        print(len(self.error.valid_ema))
+                        raise
+
 
             # Stop learning if learning rate becomes too small
             if self.lr / self.high_lr < 1e-10:
                 break
 
         if self.do_validation:
-            for param, value in self.best_params.items():
-                param.set_value(value, borrow=False)
+            for param in self.best_params:
+                param.set_value(self.best_params[param], borrow=False)
 
 
 
@@ -380,6 +386,7 @@ class sgd(object):
         cost = 0
         error = 0
         nb_minibatches = 0
+        nb_tasks = 0
 
         # Backup params
         self.backup_params = {param:param.get_value(borrow=False) for param in self.params}
@@ -391,9 +398,7 @@ class sgd(object):
             warnings.simplefilter("ignore")
 
             # Extract iterator if available (this is why self.train_data is a property descriptor)
-            train_data = self.train_data
-
-            for i, (data, labels) in enumerate(train_data):
+            for i, (data, labels) in enumerate(self.train_data):
 
                 # Update train set shared variable if needed
                 st = time()
@@ -404,7 +409,7 @@ class sgd(object):
 
                 # Perform minibatch learning
                 st=time()
-                for j in xrange(data.shape[0] // self.minibatch_sz):
+                for j in range(data.shape[0] // self.minibatch_sz):
                         output = self.learningstep_fn(j, self.minibatch_sz, self.momentum, self.lr)
                         cost += output[0]
                         if self.supervised :
@@ -412,21 +417,23 @@ class sgd(object):
                         nb_minibatches += 1
                 processtime += time()-st
 
-            if hasattr(train_data, 'distortiontime'):
-                print '    Performance on approx {} examples: '.format(nb_minibatches*self.minibatch_sz)
-                print '        Data read time       = {:3.2f}'.format(train_data.readtime)
-                print '        Data distortion time = {:3.2f}'.format(train_data.distortiontime)
-                print '        Set value time       = {:3.2f}'.format(setvaltime)
-                print '        GPU processing time  = {:3.2f}'.format(processtime)
-                del train_data
+                nb_tasks += 1
+
+            if hasattr(self.train_data, 'getperftrace'):
+                print('    Performance on approx {} examples, divided in {} tasks: '.format(nb_minibatches*self.minibatch_sz, nb_tasks))
+                print('        Set value time       = {:3.2f}'.format(setvaltime))
+                print('        GPU processing time  = {:3.2f}'.format(processtime))
+                for name, val in self.train_data.getperftrace().items():
+                    print('        Data {:15s} = {:3.2f}'.format(name, val))
                 gc.collect()
 
-        self.cost.train += [cost/nb_minibatches]
-        if self.supervised:
-            self.error.train += [error/nb_minibatches]
+        if nb_minibatches :
+            self.cost.train += [cost/nb_minibatches]
+            if self.supervised:
+                self.error.train += [error/nb_minibatches]
 
     @timing
-    def __valid(self):
+    def __valid(self, epoch):
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -442,15 +449,21 @@ class sgd(object):
                     cost += self.valid_cost_fn(data) * data.shape[0]
                 nb_examples += data.shape[0]
 
-            self.cost.valid += [cost / nb_examples]
-            if self.supervised:
-                self.error.valid += [error / nb_examples]
+        self.cost.epoch += [epoch]
+        self.cost.valid += [cost / nb_examples]
+        if self.supervised:
+            self.error.valid += [error / nb_examples]
+            self.error.epoch += [epoch]
+
 
         performance = self.error.valid[-1] if self.supervised else self.cost.valid[-1]
 
         if performance < self.best_performance:
+            if self.best_performance != sys.float_info.max:
+                print('    New best performance achieved at {:0.4f} from {:0.4f}'.format(performance, self.best_performance))
             self.best_performance = performance
-            self.best_params = {param:param.get_value(borrow=False) for param in self.params}
+            for param in self.best_params:
+                self.best_params[param] = param.get_value(borrow=False)
 
 
     @timing
@@ -459,15 +472,15 @@ class sgd(object):
         cost_train_str = 'train cost = {:.4f}'.format(self.cost.train[-1])
         cost_train_smooth_str = 'smoothed = {:.4f}'.format(self.cost.train_ema[-1])
         error_train_str = 'error = {:.4f}'.format(self.error.train[-1]) if self.supervised else ''
-        print '{}{}; {}; {}'.format(epoch_str, cost_train_str, cost_train_smooth_str, error_train_str)
+        print('{}{}; {}; {}'.format(epoch_str, cost_train_str, cost_train_smooth_str, error_train_str))
         offset =' '*len(epoch_str)
         if self.do_validation:
             cost_valid_str = 'valid cost = {:.4f}'.format(self.cost.valid[-1])
             cost_valid_smooth_str = 'smoothed = {:.4f}'.format(self.cost.valid_ema[-1])
             error_valid_str = '\033[1merror = {:.4f}\033[0m'.format(self.error.valid[-1]) if self.supervised else ''
-            print '{}{}; {}; {}'.format(offset, cost_valid_str, cost_valid_smooth_str, error_valid_str)
-        print '{}Time = {:0.2f}s. (Train={:0.2f}s. Valid={:0.2f}s. Log={:0.2f}s. Graphs={:0.2f}s. Debug={:0.2f}s.)'.format(offset, total_time, self.__train.elapsed, self.__valid.elapsed, self.__log_output.elapsed, self.__graph_output.elapsed, self.__debug.elapsed).rjust(len('Epoch')+10)
-        print '{}Learning rate = {}'.format(offset, self.lr)
+            print('{}{}; {}; {}'.format(offset, cost_valid_str, cost_valid_smooth_str, error_valid_str))
+        print('{}Time = {:0.2f}s. (Train={:0.2f}s. Valid={:0.2f}s. Log={:0.2f}s. Graphs={:0.2f}s. Debug={:0.2f}s.)'.format(offset, total_time, self.__train.last, self.__valid.last, self.__log_output.last, self.__graph_output.last, self.__debug.last).rjust(len('Epoch')+10))
+        print('{}Learning rate = {}'.format(offset, self.lr))
 
     @timing
     def __graph_output(self, epoch):
@@ -560,8 +573,8 @@ class sgd(object):
                 try:
                     sp[0,4].hist(remove=True, x=data, bins=35)
                 except:
-                    print param
-                    print data.shape
+                    print(param)
+                    print(data.shape)
                     raise
                 sp[0,4].set_title(r'$ \measuredangle ( w^{{(t={})}}_i, u^{{(t={})}}_i ) \/ i \in [1,{}] $'.format(epoch, epoch, len(data)), fontsize=10)
                 sp[1,4].add_point(p005=(epoch,p005), median=(epoch,median), p995=(epoch,p995), std=(epoch,data.std()))
@@ -585,7 +598,7 @@ class sgd(object):
         ########  Learning statistic associated with optimized parameters
         if self.debug_nodes:
             outputs = self.debug_fn()
-            for (name, node), data in zip(self.debug_nodes.items(), outputs):
+            for (name, node), data in zip(list(self.debug_nodes.items()), outputs):
                 sp = self.subplots[node]
                 data = data.flatten()
                 nonzeros = float((data!=0).mean())
@@ -617,7 +630,7 @@ class sgd(object):
             self.learning_divergence_counter += 1
 
             if self.learning_divergence_counter >= 100:
-                raise ValueError, '    --  Numerical instability in unsupervised learning at epochs {}'.format(self.learning_divergence_counter)
+                raise ValueError('    --  Numerical instability in unsupervised learning at epochs {}'.format(self.learning_divergence_counter))
 
             if len(self.cost.train) > 1:
                 self.cost.train[-1] = self.cost.train[-2]
@@ -626,7 +639,7 @@ class sgd(object):
                     self.cost.valid[-1] = self.cost.valid[-2]
 
             # Revert to backup parameter from last epoch
-            for param, value in self.backup_params.items():
+            for param, value in list(self.backup_params.items()):
                 param.set_value(value, borrow=False)
 
             # Reset momentum
@@ -634,9 +647,9 @@ class sgd(object):
 
             if self.learning_divergence_counter > 10:
                 self.lr /= 1.1
-                print "    --  Numerical instability at epoch {}.  Reseting momentum.  Set learning rate to {}".format(len(self.cost.train)-1, self.lr)
+                print("    --  Numerical instability at epoch {}.  Reseting momentum.  Set learning rate to {}".format(len(self.cost.train)-1, self.lr))
             else:
-                print "    --  Numerical instability at epoch {}.  Reseting momentum.".format(len(self.cost.train)-1)
+                print("    --  Numerical instability at epoch {}.  Reseting momentum.".format(len(self.cost.train)-1))
 
             return True
 
@@ -720,7 +733,7 @@ class sgd(object):
 
     def __reset_momentum(self):
         # Reset momentum
-        for param, shared in self.last_update.items():
+        for param, shared in list(self.last_update.items()):
             shared.set_value(np.zeros_like(shared.get_value()))
 
 
@@ -751,6 +764,6 @@ if __name__ == '__main__':
     test = sgd(inp=inp, train_data=[(train_data, train_labels)], valid_data=[(valid_data, valid_labels)],
                       max_epoch=10, lookback=10, minibatch_sz=10, lr=0.01, output_path = './sgd_test')
 
-    test = test(model.params.values(), cost, cost, lab, error, error,  model_id='test')
+    test = test(list(model.params.values()), cost, cost, lab, error, error,  model_id='test')
 
     test.learn()

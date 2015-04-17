@@ -1,3 +1,3 @@
 #
 
-from sgd_ import sgd
+from .sgd_ import sgd

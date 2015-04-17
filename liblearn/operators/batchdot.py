@@ -20,7 +20,7 @@ def batchdot(x, y):
     elif x.ndim == 3 and y.ndim == 3:
         result, _ = scan(fn=lambda a, b: dot(a, b), outputs_info=None, sequences=[x,y], non_sequences=None)
     else :
-        raise NotImplementedError, "x.ndim (={}) and y.ndim (={}) must be 2 or 3".format(x.ndim, y.ndim)
+        raise NotImplementedError("x.ndim (={}) and y.ndim (={}) must be 2 or 3".format(x.ndim, y.ndim))
 
     return result
 
@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     thea = fn(x,y)
     
-    print thea.shape
+    print(thea.shape)
 
-    print trad - thea
+    print(trad - thea)
 

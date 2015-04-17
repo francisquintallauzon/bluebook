@@ -19,7 +19,7 @@ class datamodel(object):
     @classes.setter
     def classes(self, other):
         if id(other) != id(self.__classes):
-            raise ValueError, "Property 'classes' cannot change id"
+            raise ValueError("Property 'classes' cannot change id")
         self.__classes = other
 
     @property
@@ -29,7 +29,7 @@ class datamodel(object):
     @examples.setter
     def examples(self, other):
         if id(other) != id(self.__examples):
-            raise ValueError, "Property 'examples' cannot change id"
+            raise ValueError("Property 'examples' cannot change id")
         self.__examples = other
 
     @property
